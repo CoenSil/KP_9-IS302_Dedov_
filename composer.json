@@ -1,0 +1,12 @@
+{
+    "name": "company/timesheet",
+    "description": "Веб-система учёта рабочего времени: зависимости для экспорта табеля Т-13 в Excel.",
+    "require": {
+        "php": ">=8.0",
+        "phpoffice/phpspreadsheet": "^1.29"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
