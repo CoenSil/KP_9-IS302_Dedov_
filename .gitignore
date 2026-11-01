@@ -15,6 +15,10 @@
 /sql/
 /docs/
 
+# Markdown: в репозитории остаётся только README.md
+*.md
+!/README.md
+
 # Служебные файлы ОС
 .DS_Store
 Thumbs.db
