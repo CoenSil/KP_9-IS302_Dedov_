@@ -84,8 +84,20 @@ class Employee
         }, $stmt->fetchAll());
     }
 
+    public static function updatePassword(int $id, string $plainPassword): void
+    {
+        $stmt = Database::connect()->prepare(
+            'UPDATE employees SET password_hash = :hash WHERE id = :id'
+        );
+        $stmt->execute([
+            'hash' => password_hash($plainPassword, PASSWORD_DEFAULT),
+            'id'   => $id,
+        ]);
+    }
+
     public static function updateSchedule(int $id, int $companyId, ?string $login, ?string $logout): void
     {
+
         $stmt = Database::connect()->prepare(
             'UPDATE employees
              SET custom_planned_login = :login, custom_planned_logout = :logout

@@ -152,6 +152,8 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .error { color: var(--danger); background: var(--danger-tint); border-color: #F0B8B2; }
 .banner--ok { color: var(--accent); background: var(--accent-tint); border-color: #A9DBC6; }
 .banner--ok strong { font-size: 16px; }
+.banner--warn { color: var(--warn); background: var(--warn-tint); border-color: #EBCB95; }
+.banner--info { color: var(--brand); background: var(--brand-tint); border-color: #BBC8F5; }
 
 .status-pill {
   display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;

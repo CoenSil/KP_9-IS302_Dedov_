@@ -30,6 +30,30 @@ define('VERIFY_TIMEOUT', 5 * 60);
 // Форс-мажор: максимальная длина комментария.
 define('FORCE_MAJEURE_COMMENT_MAX', 500);
 
+// --- Почта ---------------------------------------------------------------
+// transport: 'mail' — отправка через mail() хостинга, 'log' — только запись
+// в storage/logs/mail.log (удобно, пока ящик не настроен).
+define('MAIL_TRANSPORT', 'mail');
+define('MAIL_FROM', 'no-reply@example.ru');
+define('MAIL_FROM_NAME', 'OpresSence');
+
+// --- Служебные ключи -----------------------------------------------------
+// Придумайте длинные случайные строки и не публикуйте их.
+// CRON_KEY  — запуск /cron.php?key=... внешним планировщиком;
+// HEALTH_KEY — подробный ответ /health.php;
+// MIGRATE_KEY — разовый запуск /migrate.php.
+define('CRON_KEY', '');
+define('HEALTH_KEY', '');
+define('MIGRATE_KEY', '');
+
+// --- Реквизиты для лендинга и документов --------------------------------
+define('LEGAL_NAME', 'ИП Фамилия Имя Отчество');
+define('LEGAL_INN', '');
+define('LEGAL_EMAIL', 'hello@example.ru');
+define('LEGAL_PHONE', '');
+// Куда приходят заявки с сайта.
+define('LEAD_EMAIL', 'hello@example.ru');
+
 date_default_timezone_set('Asia/Novosibirsk');
 
 define('SESSION_LIFETIME', 12 * 60 * 60);

@@ -246,7 +246,7 @@
       setButtonsDisabled(true);
       if (expiring) return;
       expiring = true;
-      fetch(config.expireUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'token=' + encodeURIComponent(challenge.token || '') })
+      fetch(config.expireUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'token=' + encodeURIComponent(challenge.token || '') + '&_token=' + encodeURIComponent(window.OPRES_CSRF || '') })
         .then(readJson)
         .then(function (data) {
           expiring = false;
@@ -296,7 +296,7 @@
     fetch(config.answerUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'token=' + encodeURIComponent(challenge.token || '') + '&answer=' + encodeURIComponent(value),
+      body: 'token=' + encodeURIComponent(challenge.token || '') + '&answer=' + encodeURIComponent(value) + '&_token=' + encodeURIComponent(window.OPRES_CSRF || ''),
     })
       .then(readJson)
       .then(function (data) {

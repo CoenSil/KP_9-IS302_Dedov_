@@ -3,6 +3,9 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
+use App\Core\Mailer;
+use App\Core\RateLimit;
+use App\Core\Security;
 use App\Core\Settings;
 use App\Core\Validator;
 use App\Models\Employee;
@@ -10,6 +13,7 @@ use App\Models\Attendance;
 use App\Models\BreakTime;
 use App\Models\Company;
 use App\Models\Group;
+use App\Models\PasswordReset;
 use App\Models\Position;
 use App\Models\Verification;
 
@@ -54,22 +58,32 @@ class AuthController extends Controller
             $password = (string) ($_POST['password'] ?? '');
             $emailError = Validator::emailError($email);
 
-            $company  = $companyCode !== '' ? Company::findByCode($companyCode) : null;
-            $company  = ($company && (int) $company['is_active'] === 1) ? $company : null;
-            $employee = ($company && $emailError === null) ? Employee::findByEmail($email, (int) $company['id']) : null;
+            $ip      = Security::clientIp();
+            $perIp   = RateLimit::hit('login:ip:' . $ip, 60, 600);
+            $perUser = RateLimit::hit('login:user:' . $ip . ':' . sha1($email), 10, 600);
 
-            if ($emailError !== null) {
-                $error = 'Введите корректный email.';
-            } elseif ($employee && password_verify($password, $employee['password_hash'])) {
-                if ($employee['role'] === 'employee' && Attendance::isBlockedToday((int) $employee['id'])) {
-                    Attendance::markReentryRequested((int) $employee['id']);
-                    $error = 'На сегодня смена уже закрыта. Запрос на повторный вход отправлен администратору.';
-                } else {
-                    $this->openSession($employee, $company);
-                    $this->redirect($this->homeRoute());
-                }
+            if (!$perIp['allowed'] || !$perUser['allowed']) {
+                $error = 'Слишком много попыток входа. Попробуйте '
+                    . RateLimit::retryText(max($perIp['retry'], $perUser['retry'])) . '.';
             } else {
-                $error = 'Неверный код организации, email или пароль.';
+                $company  = $companyCode !== '' ? Company::findByCode($companyCode) : null;
+                $company  = ($company && (int) $company['is_active'] === 1) ? $company : null;
+                $employee = ($company && $emailError === null) ? Employee::findByEmail($email, (int) $company['id']) : null;
+
+                if ($emailError !== null) {
+                    $error = 'Введите корректный email.';
+                } elseif ($employee && password_verify($password, $employee['password_hash'])) {
+                    RateLimit::clear('login:user:' . $ip . ':' . sha1($email));
+                    if ($employee['role'] === 'employee' && Attendance::isBlockedToday((int) $employee['id'])) {
+                        Attendance::markReentryRequested((int) $employee['id']);
+                        $error = 'На сегодня смена уже закрыта. Запрос на повторный вход отправлен администратору.';
+                    } else {
+                        $this->openSession($employee, $company);
+                        $this->redirect($this->homeRoute());
+                    }
+                } else {
+                    $error = 'Неверный код организации, email или пароль.';
+                }
             }
         }
 
@@ -89,7 +103,12 @@ class AuthController extends Controller
         $errors = [];
         $v = ['name' => '', 'code' => '', 'admin_name' => '', 'admin_email' => ''];
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $gate = RateLimit::hit('register:ip:' . Security::clientIp(), 10, 3600);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$gate['allowed']) {
+            $errors[] = 'Слишком много попыток регистрации с этого адреса. Попробуйте '
+                . RateLimit::retryText($gate['retry']) . '.';
+        } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($v as $k => $_) {
                 $v[$k] = trim((string) ($_POST[$k] ?? ''));
             }
@@ -212,6 +231,158 @@ class AuthController extends Controller
         }
 
         $this->access('school', 'student', 'register', ['errors' => $errors, 'v' => $v]);
+    }
+
+    /**
+     * Запрос ссылки восстановления пароля.
+     */
+    public function forgot(): void
+    {
+        if (!empty($_SESSION['employee_id'])) {
+            $this->redirect($this->homeRoute());
+        }
+
+        [$org] = $this->mode();
+        $error = null;
+        $sent  = false;
+        $companyCode = Company::normalizeCode((string) ($_POST['company'] ?? $_GET['c'] ?? ''));
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $ip    = Security::clientIp();
+            $email = Validator::normalizeEmail((string) ($_POST['email'] ?? ''));
+
+            $perIp   = RateLimit::hit('forgot:ip:' . $ip, 20, 3600);
+            $perMail = RateLimit::hit('forgot:mail:' . $ip . ':' . sha1($email . '|' . $companyCode), 5, 3600);
+
+            if (!$perIp['allowed'] || !$perMail['allowed']) {
+                $error = 'Слишком много запросов. Попробуйте '
+                    . RateLimit::retryText(max($perIp['retry'], $perMail['retry'])) . '.';
+            } else {
+                if ($companyCode !== '' && Validator::emailError($email) === null) {
+                    try {
+                        $company  = Company::findByCode($companyCode);
+                        $employee = ($company && (int) $company['is_active'] === 1)
+                            ? Employee::findByEmail($email, (int) $company['id'])
+                            : null;
+
+                        if ($employee) {
+                            $token = PasswordReset::create((int) $employee['id'], $ip);
+                            Mailer::sendPasswordReset(
+                                (string) $employee['email'],
+                                (string) $employee['full_name'],
+                                $this->absoluteUrl('auth/reset', ['token' => $token]),
+                                PasswordReset::TTL_MINUTES
+                            );
+                        }
+                    } catch (\Throwable $e) {
+                        error_log('Password reset request: ' . $e->getMessage());
+                    }
+                }
+                // Ответ одинаковый всегда: не показываем, есть такой профиль или нет.
+                $sent = true;
+            }
+        }
+
+        $this->view('auth/forgot', [
+            'org'         => $org,
+            'error'       => $error,
+            'sent'        => $sent,
+            'companyCode' => $companyCode,
+        ]);
+    }
+
+    /**
+     * Установка нового пароля по одноразовой ссылке.
+     */
+    public function reset(): void
+    {
+        $token = (string) ($_POST['token'] ?? $_GET['token'] ?? '');
+        $error = null;
+        $done  = false;
+        $row   = null;
+
+        try {
+            $row = PasswordReset::findValid($token);
+        } catch (\Throwable $e) {
+            error_log('Password reset lookup: ' . $e->getMessage());
+        }
+
+        if ($row === null) {
+            $error = 'Ссылка недействительна или уже использована. Запросите новую.';
+        } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $password  = (string) ($_POST['password'] ?? '');
+            $password2 = (string) ($_POST['password2'] ?? '');
+
+            if (mb_strlen($password) < 8) {
+                $error = 'Пароль должен быть не короче 8 символов.';
+            } elseif ($password !== $password2) {
+                $error = 'Пароли не совпадают.';
+            } else {
+                try {
+                    Employee::updatePassword((int) $row['employee_id'], $password);
+                    PasswordReset::consume((int) $row['id']);
+                    $done = true;
+                } catch (\Throwable $e) {
+                    error_log('Password reset save: ' . $e->getMessage());
+                    $error = 'Не удалось сохранить пароль. Попробуйте позже.';
+                }
+            }
+        }
+
+        $this->view('auth/reset', [
+            'error' => $error,
+            'done'  => $done,
+            'token' => $token,
+            'email' => (string) ($row['email'] ?? ''),
+        ]);
+    }
+
+    /**
+     * Смена пароля из личного кабинета.
+     */
+    public function password(): void
+    {
+        $session = $this->requireAuth(false, false);
+        $error = null;
+        $done  = false;
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $current   = (string) ($_POST['current'] ?? '');
+            $password  = (string) ($_POST['password'] ?? '');
+            $password2 = (string) ($_POST['password2'] ?? '');
+
+            $employee = Employee::findById((int) $session['employee_id'], (int) $session['company_id']);
+
+            if (!$employee || empty($employee['password_hash']) || !password_verify($current, (string) $employee['password_hash'])) {
+                $error = 'Текущий пароль указан неверно.';
+            } elseif (mb_strlen($password) < 8) {
+                $error = 'Новый пароль должен быть не короче 8 символов.';
+            } elseif ($password !== $password2) {
+                $error = 'Новые пароли не совпадают.';
+            } elseif (password_verify($password, (string) $employee['password_hash'])) {
+                $error = 'Новый пароль совпадает с текущим.';
+            } else {
+                try {
+                    Employee::updatePassword((int) $employee['id'], $password);
+                    $done = true;
+                } catch (\Throwable $e) {
+                    error_log('Password change: ' . $e->getMessage());
+                    $error = 'Не удалось изменить пароль. Попробуйте позже.';
+                }
+            }
+        }
+
+        $this->view('auth/password', ['error' => $error, 'done' => $done]);
+    }
+
+    private function absoluteUrl(string $route, array $params = []): string
+    {
+        $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        $base = defined('BASE_URL') ? (string) BASE_URL : '/';
+        $path = rtrim($base, '/') . '/index.php';
+        $query = http_build_query(array_merge(['route' => $route], $params));
+
+        return (Security::isHttps() ? 'https://' : 'http://') . $host . $path . '?' . $query;
     }
 
     private function openSession(array $employee, array $company): void

@@ -67,6 +67,7 @@ $lede = $act === 'login'
           </div>
           <button type="submit">Войти</button>
         </form>
+        <p class="switchline"><a href="<?= BASE_URL ?>index.php?route=auth/forgot">Забыли пароль?</a></p>
         <?php if ($student): ?>
           <p class="switchline">Нет профиля? <a href="<?= $url('school', 'student', 'register') ?>">Регистрация по инвайт-коду</a></p>
         <?php elseif ($registrationOpen): ?>

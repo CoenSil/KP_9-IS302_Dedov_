@@ -9,6 +9,19 @@
 <div id="notifBox"></div>
 <div id="attentionBox"></div>
 
+<?php if (!empty($subscription) && ($subscription['status'] === 'expired' || ($subscription['days_left'] !== null && $subscription['days_left'] <= 5))): ?>
+  <?php $expired = $subscription['status'] === 'expired'; ?>
+  <div class="banner <?= $expired ? 'banner--warn' : 'banner--info' ?>" role="status">
+    <?php if ($expired): ?>
+      Подписка истекла <?= htmlspecialchars((string) $subscription['until']) ?>. Данные сохранены, доступ к разделам ограничен.
+    <?php else: ?>
+      Пробный доступ заканчивается <?= htmlspecialchars((string) $subscription['until']) ?>
+      (осталось <?= (int) $subscription['days_left'] ?> дн.).
+    <?php endif; ?>
+    <a href="<?= BASE_URL ?>index.php?route=admin/billing">Подробнее</a>
+  </div>
+<?php endif; ?>
+
 <div class="toolbar">
   <div class="chips" id="chips" role="group" aria-label="Фильтр по статусу"></div>
   <div class="toolbar__right">

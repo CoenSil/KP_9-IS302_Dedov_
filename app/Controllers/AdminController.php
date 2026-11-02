@@ -13,6 +13,7 @@ use App\Models\DailyHours;
 use App\Models\ScreenShare;
 use App\Models\Notification;
 use App\Models\Company;
+use App\Models\Subscription;
 use App\Models\BreakTime;
 use App\Models\Workplace;
 use App\Models\ForceMajeure;
@@ -28,12 +29,31 @@ class AdminController extends Controller
         $this->requireAdmin();
         AbsenceMonitor::checkThrottled();
         $companyId = $this->companyId();
+        $company   = Company::find($companyId);
         $this->view('admin/dashboard', [
             'employees'     => self::employeesWithStatus($companyId),
             'notifications' => self::safeAdminNotifications($companyId),
             'forceOpen'     => self::safeOpenForce($companyId),
             'collapseCount' => self::safeCollapseCount($companyId),
             'serverNow'     => date('Y-m-d H:i:s'),
+            'subscription'  => Subscription::state($company),
+        ]);
+    }
+
+    public function billing(): void
+    {
+        $this->requireAdmin();
+        $companyId = $this->companyId();
+        $company   = Company::find($companyId);
+
+        $this->view('admin/billing', [
+            'company'        => $company,
+            'state'          => Subscription::state($company),
+            'planLabel'      => Subscription::planLabel($company),
+            'limitEmployees' => Subscription::limit($company, 'employees'),
+            'limitStudents'  => Subscription::limit($company, 'students'),
+            'employeesCount' => Company::countEmployees($companyId),
+            'homeRoute'      => $this->homeRoute(),
         ]);
     }
 
@@ -185,6 +205,11 @@ class AdminController extends Controller
             }
             if ($password !== '' && mb_strlen($password) < 6) {
                 $errors[] = 'Пароль должен быть не короче 6 символов.';
+            }
+
+            $limit = Subscription::limit(Company::find($companyId), 'employees');
+            if ($limit > 0 && Company::countEmployees($companyId) >= $limit) {
+                $errors[] = 'Достигнут лимит тарифа: ' . $limit . ' человек. Чтобы добавить больше, напишите нам — расширим тариф.';
             }
 
             if (empty($errors)) {

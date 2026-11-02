@@ -14,14 +14,39 @@ spl_autoload_register(function ($class) {
     }
 });
 
+\App\Core\Security::bootstrap();
 session_start();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !\App\Core\Csrf::check(\App\Core\Csrf::submitted())) {
+    http_response_code(419);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">'
+        . '<title>Страница устарела</title></head><body style="font-family:sans-serif;max-width:520px;margin:80px auto;line-height:1.5">'
+        . '<h1>Страница устарела</h1>'
+        . '<p>Форма открыта слишком давно или в другой вкладке. Обновите страницу и попробуйте снова — данные не потеряны.</p>'
+        . '<p><a href="' . htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8') . 'index.php">Вернуться на главную</a></p>'
+        . '</body></html>';
+    exit;
+}
+
+// Токен CSRF добавляется во все POST-формы автоматически.
+ob_start(['App\\Core\\Csrf', 'inject']);
 
 use App\Core\Router;
 
 $router = new Router();
 
+$router->add('site/home',     'SiteController', 'home');
+$router->add('site/offer',    'SiteController', 'offer');
+$router->add('site/privacy',  'SiteController', 'privacy');
+$router->add('site/contacts', 'SiteController', 'contacts');
+$router->add('site/lead',     'SiteController', 'lead');
+
 $router->add('auth/login',  'AuthController', 'login');
 $router->add('auth/logout', 'AuthController', 'logout');
+$router->add('auth/forgot', 'AuthController', 'forgot');
+$router->add('auth/reset',  'AuthController', 'reset');
+$router->add('auth/password', 'AuthController', 'password');
 $router->add('auth/register', 'AuthController', 'register');
 $router->add('auth/register-student', 'AuthController', 'registerStudent');
 $router->add('auth/verify',         'AuthController', 'verify');
@@ -46,6 +71,7 @@ $router->add('employee/screen/frame', 'EmployeeController', 'screenFrame');
 $router->add('employee/screen/stop',  'EmployeeController', 'screenStop');
 
 $router->add('admin/dashboard',       'AdminController', 'dashboard');
+$router->add('admin/billing',         'AdminController', 'billing');
 $router->add('admin/dashboard/data',  'AdminController', 'dashboardData');
 $router->add('admin/notifications/read',   'AdminController', 'notificationRead');
 $router->add('admin/notifications/cancel', 'AdminController', 'notificationCancel');
@@ -100,6 +126,8 @@ $router->add('super/logout',             'SuperController', 'logout');
 $router->add('super/companies',          'SuperController', 'companies');
 $router->add('super/companies/create',   'SuperController', 'companyCreate');
 $router->add('super/companies/toggle',   'SuperController', 'companyToggle');
+$router->add('super/companies/plan',     'SuperController', 'companyPlan');
+$router->add('super/leads',              'SuperController', 'leads');
 
-$route = $_GET['route'] ?? 'auth/login';
+$route = $_GET['route'] ?? 'site/home';
 $router->dispatch($route);

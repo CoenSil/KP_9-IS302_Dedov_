@@ -6,11 +6,13 @@ use App\Core\Controller;
 use App\Core\Password;
 use App\Core\Validator;
 use App\Models\Employee;
+use App\Models\Company;
 use App\Models\Group;
 use App\Models\Lesson;
 use App\Models\LessonAttendance;
 use App\Models\Position;
 use App\Models\School;
+use App\Models\Subscription;
 use App\Models\Verification;
 use App\Services\LessonExporter;
 
@@ -174,6 +176,11 @@ class SchoolController extends Controller
                 : Position::idFor($companyId, 'teacher');
             if (!$positionId) {
                 $errors[] = 'Не найдена должность для выбранной роли.';
+            }
+
+            $limit = Subscription::limit(Company::find($companyId), 'employees');
+            if ($limit > 0 && Company::countEmployees($companyId) >= $limit) {
+                $errors[] = 'Достигнут лимит тарифа: ' . $limit . ' человек. Чтобы добавить больше, напишите нам — расширим тариф.';
             }
 
             if (empty($errors)) {

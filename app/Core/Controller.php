@@ -6,6 +6,7 @@ use App\Models\Attendance;
 use App\Models\Lunch;
 use App\Models\BreakTime;
 use App\Models\Company;
+use App\Models\Subscription;
 use App\Models\Verification;
 
 class Controller
@@ -46,10 +47,18 @@ class Controller
         }
 
         $companyId = (int) ($_SESSION['company_id'] ?? 0);
-        if ($companyId === 0 || !Company::isActive($companyId)) {
+        $company   = $companyId > 0 ? Company::find($companyId) : null;
+        if (!$company || (int) $company['is_active'] !== 1) {
             $_SESSION = [];
             session_destroy();
             $this->redirect('auth/login');
+        }
+
+        if (Subscription::isExpired($company) && ($_SESSION['role'] ?? '') === 'admin') {
+            $route = (string) ($_GET['route'] ?? '');
+            if (!str_starts_with($route, 'admin/billing') && !str_starts_with($route, 'auth/')) {
+                $this->redirect('admin/billing');
+            }
         }
 
         if ($checkVerify) {
@@ -67,7 +76,7 @@ class Controller
         } elseif ($role === 'admin' && $type === 'school') {
             $area = 'school/';
         }
-        if ($area !== null && !str_starts_with($route, $area) && !str_starts_with($route, 'auth/')) {
+        if ($area !== null && !str_starts_with($route, $area) && !str_starts_with($route, 'auth/') && !str_starts_with($route, 'admin/billing')) {
             $this->redirect($this->homeRoute());
         }
 

@@ -3,9 +3,11 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
+use App\Core\Database;
 use App\Core\Validator;
 use App\Models\Company;
 use App\Models\PlatformAdmin;
+use App\Models\Subscription;
 
 class SuperController extends Controller
 {
@@ -19,18 +21,25 @@ class SuperController extends Controller
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $email    = trim($_POST['email'] ?? '');
             $password = (string) ($_POST['password'] ?? '');
-            $admin    = PlatformAdmin::findByEmail($email);
+            $gate     = \App\Core\RateLimit::hit('super:login:' . \App\Core\Security::clientIp(), 10, 600);
 
-            if ($admin && password_verify($password, $admin['password_hash'])) {
-                session_regenerate_id(true);
-                $_SESSION = [
-                    'super_id'  => (int) $admin['id'],
-                    'full_name' => $admin['full_name'],
-                    'role'      => 'superadmin',
-                ];
-                $this->redirect('super/companies');
+            if (!$gate['allowed']) {
+                $error = 'Слишком много попыток входа. Попробуйте '
+                    . \App\Core\RateLimit::retryText($gate['retry']) . '.';
+            } else {
+                $admin = PlatformAdmin::findByEmail($email);
+
+                if ($admin && password_verify($password, $admin['password_hash'])) {
+                    session_regenerate_id(true);
+                    $_SESSION = [
+                        'super_id'  => (int) $admin['id'],
+                        'full_name' => $admin['full_name'],
+                        'role'      => 'superadmin',
+                    ];
+                    $this->redirect('super/companies');
+                }
+                $error = 'Неверный email или пароль.';
             }
-            $error = 'Неверный email или пароль.';
         }
 
         $this->view('super/login', ['error' => $error]);
@@ -109,6 +118,60 @@ class SuperController extends Controller
         }
 
         $this->view('super/company_create', ['errors' => $errors, 'v' => $v, 'created' => $created]);
+    }
+
+    public function companyPlan(): void
+    {
+        $this->requireSuper();
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $id      = (int) ($_POST['id'] ?? 0);
+            $company = $id > 0 ? Company::find($id) : null;
+
+            if ($company) {
+                $plan = (string) ($_POST['plan'] ?? 'trial');
+                if (!array_key_exists($plan, Subscription::PLANS)) {
+                    $plan = 'trial';
+                }
+
+                $paid  = $this->postDate($_POST['paid_until'] ?? '');
+                $trial = $this->postDate($_POST['trial_ends_at'] ?? '');
+                $maxE  = max(0, (int) ($_POST['max_employees'] ?? 0));
+                $maxS  = max(0, (int) ($_POST['max_students'] ?? 0));
+
+                try {
+                    Company::setSubscription($id, $plan, $paid, $trial, $maxE, $maxS);
+                    $_SESSION['flash'] = 'Тариф компании «' . $company['name'] . '» обновлён.';
+                } catch (\Throwable $e) {
+                    error_log('Company plan update: ' . $e->getMessage());
+                    $_SESSION['flash'] = 'Не удалось обновить тариф. Проверьте, что выполнена sql/migration_saas.sql.';
+                }
+            }
+        }
+
+        $this->redirect('super/companies');
+    }
+
+    public function leads(): void
+    {
+        $this->requireSuper();
+
+        $leads = [];
+        try {
+            $leads = Database::connect()
+                ->query('SELECT * FROM leads ORDER BY id DESC LIMIT 200')
+                ->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('Leads list: ' . $e->getMessage());
+        }
+
+        $this->view('super/leads', ['leads' => $leads]);
+    }
+
+    private function postDate($value): ?string
+    {
+        $value = trim((string) $value);
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value . ' 23:59:59' : null;
     }
 
     public function companyToggle(): void

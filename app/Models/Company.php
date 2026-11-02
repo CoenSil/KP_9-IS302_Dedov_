@@ -70,6 +70,37 @@ class Company
         $stmt->execute(['a' => $active ? 1 : 0, 'id' => $id]);
     }
 
+    public static function setSubscription(
+        int $id,
+        string $plan,
+        ?string $paidUntil,
+        ?string $trialEnds,
+        int $maxEmployees,
+        int $maxStudents
+    ): void {
+        $stmt = Database::connect()->prepare(
+            'UPDATE companies
+             SET plan = :plan, paid_until = :paid, trial_ends_at = :trial,
+                 max_employees = :me, max_students = :ms
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'plan'  => $plan,
+            'paid'  => $paidUntil,
+            'trial' => $trialEnds,
+            'me'    => $maxEmployees,
+            'ms'    => $maxStudents,
+            'id'    => $id,
+        ]);
+    }
+
+    public static function countEmployees(int $id): int
+    {
+        $stmt = Database::connect()->prepare('SELECT COUNT(*) FROM employees WHERE company_id = :id');
+        $stmt->execute(['id' => $id]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public static function createWithAdmin(
         string $name,
         string $code,
@@ -87,6 +118,18 @@ class Company
             $db->prepare('INSERT INTO companies (name, code, type, is_active, created_at) VALUES (:n, :c, :t, 1, :now)')
                ->execute(['n' => $name, 'c' => $code, 't' => $type, 'now' => $now]);
             $companyId = (int) $db->lastInsertId();
+
+            if (Schema::columnType('companies', 'plan') !== null) {
+                $db->prepare(
+                    'UPDATE companies
+                     SET plan = :plan, trial_ends_at = :trial, max_employees = 50, max_students = 500
+                     WHERE id = :id'
+                )->execute([
+                    'plan'  => 'trial',
+                    'trial' => date('Y-m-d H:i:s', time() + Subscription::TRIAL_DAYS * 86400),
+                    'id'    => $companyId,
+                ]);
+            }
 
             $db->prepare('INSERT INTO departments (company_id, name, code, created_at) VALUES (:cid, :n, :c, :now)')
                ->execute(['cid' => $companyId, 'n' => 'Администрация', 'c' => 'ADM', 'now' => $departmentCreatedAt]);
