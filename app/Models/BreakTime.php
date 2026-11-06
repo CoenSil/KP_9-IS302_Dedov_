@@ -553,8 +553,9 @@ class BreakTime
     private static function contextFor(int $employeeId): array
     {
         $stmt = Database::connect()->prepare(
-            'SELECT e.role, e.company_id, c.type AS company_type
+            'SELECT p.role, e.company_id, c.type AS company_type
              FROM employees e
+             JOIN positions p ON p.id = e.position_id
              LEFT JOIN companies c ON c.id = e.company_id
              WHERE e.id = :id LIMIT 1'
         );

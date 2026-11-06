@@ -136,10 +136,18 @@ class Company
             $departmentId = (int) $db->lastInsertId();
 
             $positionStmt = $db->prepare(
-                'INSERT INTO positions (company_id, name, department_id, role) VALUES (:cid, :pn, :dep, :role)'
+                'INSERT INTO positions (company_id, name, department_id, role, planned_login, planned_logout)
+                 VALUES (:cid, :pn, :dep, :role, :planned_login, :planned_logout)'
             );
             $addPosition = function (string $name, int $dep, string $role) use ($positionStmt, $companyId, $db): int {
-                $positionStmt->execute(['cid' => $companyId, 'pn' => $name, 'dep' => $dep, 'role' => $role]);
+                $positionStmt->execute([
+                    'cid'             => $companyId,
+                    'pn'              => $name,
+                    'dep'             => $dep,
+                    'role'            => $role,
+                    'planned_login'   => '09:00:00',
+                    'planned_logout'  => '18:00:00',
+                ]);
                 return (int) $db->lastInsertId();
             };
 

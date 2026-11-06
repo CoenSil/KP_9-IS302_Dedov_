@@ -23,8 +23,8 @@ class LessonExporter
         fputcsv($out, [
             'Занятие', $lesson['title'], 'Тип', Lesson::KINDS[$lesson['kind']] ?? $lesson['kind'],
             'Аудитория', $lesson['room'], 'Преподаватель', $lesson['teacher_name'], 'Начало по расписанию', $lesson['scheduled_start'],
-        ], ';');
-        fputcsv($out, ['ФИО', 'Группа', 'Статус', 'Время отметки', 'Активность, %', 'Активных минут', 'Сворачиваний/потерь связи', 'Общее устройство'], ';');
+        ], ';', '"', '\\');
+        fputcsv($out, ['ФИО', 'Группа', 'Статус', 'Время отметки', 'Активность, %', 'Активных минут', 'Сворачиваний/потерь связи', 'Общее устройство'], ';', '"', '\\');
         foreach (LessonAttendance::roster($lesson, $now) as $r) {
             fputcsv($out, [
                 $r['full_name'],
@@ -35,7 +35,7 @@ class LessonExporter
                 $r['status'] === 'absent' ? '' : round($r['active_seconds'] / 60, 1),
                 $r['status'] === 'absent' ? '' : $r['away_count'],
                 $r['shared_device'] ? 'да' : '',
-            ], ';');
+            ], ';', '"', '\\');
         }
         fclose($out);
         exit;

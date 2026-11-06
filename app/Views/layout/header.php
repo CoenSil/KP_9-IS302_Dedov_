@@ -65,10 +65,12 @@ window.OPRES_CSRF = <?= json_encode(\App\Core\Csrf::token(), JSON_UNESCAPED_UNIC
     return nativeFetch.call(this, input, init);
   };
 })();
-/* Размер окна: общая проверка для страниц сотрудника и студента.
+/* Размер окна: проверка действует только в учебных заведениях.
+   В компаниях размер окна браузера не влияет на учёт активности.
    Если браузер сжат меньше половины экрана, присутствие не засчитывается.
    На телефонах проверка отключена. */
 window.OPRES_WINDOW = (function () {
+  var enforced = <?= json_encode((($_SESSION['company_type'] ?? '') === 'school')) ?>;
   function fill() {
     return {
       w: window.innerWidth || 0,
@@ -78,6 +80,7 @@ window.OPRES_WINDOW = (function () {
     };
   }
   function tooSmall() {
+    if (!enforced) return false;
     var f = fill();
     if (!f.aw || !f.ah || !f.w || !f.h) return false;
     if (f.aw <= 900) return false;
@@ -85,7 +88,7 @@ window.OPRES_WINDOW = (function () {
     var area = (f.w * f.h) / (f.aw * f.ah);
     return area < 0.5 || f.w < f.aw * 0.5 || f.h < f.ah * 0.5;
   }
-  return { fill: fill, tooSmall: tooSmall };
+  return { fill: fill, tooSmall: tooSmall, enforced: enforced };
 })();
 </script>
 </head>
