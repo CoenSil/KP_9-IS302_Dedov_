@@ -13,6 +13,9 @@ $verifyMode = ($_SESSION['company_type'] ?? 'company') === 'school' ? 'mark' : '
     <p class="verify__eyebrow">Проверка присутствия</p>
     <h2 class="verify__title" id="verifyTitle">Нажмите число <span class="verify__code" id="verifyCode">--</span></h2>
     <p class="verify__hint" id="verifyHint">Выберите правильное число из трёх вариантов — на это есть 5 минут.</p>
+    <button type="button" class="verify__notify" id="verifyNotifyBtn" hidden>
+      Показывать код поверх других окон
+    </button>
     <div class="verify__options" id="verifyOptions"></div>
     <p class="verify__error" id="verifyError" role="alert"></p>
     <div class="verify__footer">

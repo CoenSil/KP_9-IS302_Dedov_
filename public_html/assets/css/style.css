@@ -607,6 +607,24 @@ body.verify-open .page { overflow: hidden; }
   font-variant-numeric: tabular-nums;
 }
 .verify__hint { margin: 0; color: var(--ink-soft); font-size: 13.5px; }
+.verify__notify[hidden] { display: none !important; }
+.verify__notify {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 10px 0 0;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #C7D2FE;
+  border-radius: 9px;
+  background: var(--brand-tint);
+  color: var(--brand);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.verify__notify:hover { background: #DBE4FF; color: var(--brand-hover); }
 .verify__options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

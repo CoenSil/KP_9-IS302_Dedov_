@@ -157,6 +157,9 @@
   var errorEl = document.getElementById('verifyError');
   var timerEl = document.getElementById('verifyTimer');
   var modeEl = document.getElementById('verifyMode');
+  var notifyBtn = document.getElementById('verifyNotifyBtn');
+  var notifySupported = typeof window.Notification !== 'undefined';
+  var currentNotification = null;
 
   var challenge = config.challenge || null;
   var expiresAtMs = 0;
@@ -176,6 +179,64 @@
   if (modeEl && config.mode === 'mark') {
     modeEl.textContent = 'Если не ответить, в журнале появится отметка о сворачивании приложения.';
   }
+
+  function updateNotifyButton() {
+    if (!notifyBtn) return;
+    if (!notifySupported || Notification.permission === 'denied') {
+      notifyBtn.hidden = true;
+      return;
+    }
+    notifyBtn.hidden = Notification.permission === 'granted';
+  }
+
+  function closeVerifyNotification() {
+    if (!currentNotification) return;
+    try { currentNotification.close(); } catch (e) { /* ignore */ }
+    currentNotification = null;
+  }
+
+  function showVerifyNotification(next) {
+    if (!notifySupported || Notification.permission !== 'granted' || !next) return;
+    closeVerifyNotification();
+    try {
+      currentNotification = new Notification('Проверка присутствия — OpresSence', {
+        body: 'Контрольный код: ' + String(next.code || '--')
+          + '. Нажмите это число в открытом окне OpresSence.',
+        icon: config.baseUrl + 'apple-touch-icon.png',
+        tag: 'opres-verify',
+        requireInteraction: true,
+        renotify: true
+      });
+      currentNotification.onclick = function () {
+        try { window.focus(); } catch (e) { /* ignore */ }
+        closeVerifyNotification();
+      };
+    } catch (e) {
+      currentNotification = null;
+    }
+  }
+
+  if (notifyBtn) {
+    notifyBtn.addEventListener('click', function () {
+      if (!notifySupported) return;
+      var settled = false;
+      function onResult(permission) {
+        if (settled) return;
+        settled = true;
+        updateNotifyButton();
+        if (permission === 'granted' && challenge) showVerifyNotification(challenge);
+      }
+      try {
+        var request = Notification.requestPermission(onResult);
+        if (request && typeof request.then === 'function') {
+          request.then(onResult).catch(function () { /* ignore */ });
+        }
+      } catch (e) {
+        updateNotifyButton();
+      }
+    });
+  }
+  updateNotifyButton();
 
   function serverOffsetMs(c) {
     var serverNow = Number(c && c.server_now ? c.server_now : 0) * 1000;
@@ -198,6 +259,7 @@
   function hideModal() {
     modal.hidden = true;
     document.body.classList.remove('verify-open');
+    closeVerifyNotification();
     if (timerId) {
       clearInterval(timerId);
       timerId = null;
@@ -285,6 +347,8 @@
     if (timerId) clearInterval(timerId);
     timerId = setInterval(tick, 500);
     tick();
+    updateNotifyButton();
+    showVerifyNotification(next);
     var first = optionsEl.querySelector('button');
     if (first) first.focus();
   }
