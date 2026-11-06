@@ -480,7 +480,10 @@ class AdminController extends Controller
     public function monitoring(): void
     {
         $this->requireAdmin();
-        $employees = Employee::allWithDepartment($this->companyId());
+        $employees = array_values(array_filter(
+            Employee::allWithDepartment($this->companyId()),
+            static fn(array $e): bool => ($e['role'] ?? '') !== 'admin'
+        ));
         foreach ($employees as &$e) {
             $e['today'] = Attendance::todayStatusFor((int) $e['id'], $e['planned_login'], $e['planned_logout']);
             $e['screen_live'] = ScreenShare::isLive((int) $e['id']);
@@ -493,7 +496,10 @@ class AdminController extends Controller
     public function monitoringStatus(): void
     {
         $this->requireAdmin();
-        $employees = Employee::allWithDepartment($this->companyId());
+        $employees = array_values(array_filter(
+            Employee::allWithDepartment($this->companyId()),
+            static fn(array $e): bool => ($e['role'] ?? '') !== 'admin'
+        ));
         $result = [];
         foreach ($employees as $e) {
             $result[(int) $e['id']] = ScreenShare::isLive((int) $e['id']);
@@ -506,7 +512,8 @@ class AdminController extends Controller
         $this->requireAdmin();
 
         $id = (int) ($_GET['id'] ?? 0);
-        $path = Employee::findById($id, $this->companyId()) ? ScreenShare::livePath($id) : null;
+        $employee = Employee::findById($id, $this->companyId());
+        $path = ($employee && ($employee['role'] ?? '') !== 'admin') ? ScreenShare::livePath($id) : null;
 
         header('Cache-Control: no-store, max-age=0');
 
@@ -533,7 +540,7 @@ class AdminController extends Controller
         $id = (int) ($_GET['id'] ?? 0);
         $employee = Employee::findById($id, $this->companyId());
 
-        if (!$employee) {
+        if (!$employee || ($employee['role'] ?? '') === 'admin') {
             http_response_code(404);
             die('Сотрудник не найден.');
         }
