@@ -19,8 +19,8 @@ body.lp {
   -webkit-font-smoothing: antialiased;
 }
 
-.lp a { color: var(--lp-blue); text-decoration: none; }
-.lp a:hover { text-decoration: underline; }
+.lp a:not(.lp-btn) { color: var(--lp-blue); text-decoration: none; }
+.lp a:not(.lp-btn):hover { text-decoration: underline; }
 .lp h1, .lp h2, .lp h3 { line-height: 1.2; margin: 0 0 12px; }
 .lp h1 { font-size: clamp(30px, 4vw, 46px); letter-spacing: -0.02em; }
 .lp h2 { font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.01em; }
@@ -41,6 +41,7 @@ body.lp {
   font-weight: 600;
   font-size: 15px;
   border: 1px solid var(--lp-blue);
+  text-decoration: none;
   cursor: pointer;
   transition: background .15s ease, transform .15s ease;
 }
